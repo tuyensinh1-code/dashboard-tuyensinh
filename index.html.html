@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Tuyển Sinh Việt Âu</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {font-family: Arial; margin:0; background:#f4f6fb;}
+.header {background:#1e3a8a; color:white; padding:15px 25px; font-size:22px;}
+.container {padding:20px;}
+
+.kpi {display:flex; gap:15px; margin-bottom:20px;}
+.card {
+    flex:1; background:white; padding:15px; border-radius:10px;
+    text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+.card h2 {margin:5px; color:#1e3a8a;}
+
+.grid {display:grid; grid-template-columns:1fr 1fr; gap:20px;}
+.box {background:white; padding:15px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+
+.insight {
+    background:#fff7ed; padding:15px;
+    border-left:5px solid orange; margin-bottom:20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">Tổng quan tuyển sinh</div>
+
+<div class="container">
+
+<div class="kpi">
+    <div class="card"><div>Tổng học viên tiềm năng</div><h2 id="lead">0</h2></div>
+    <div class="card"><div>Học viên nhập học</div><h2 id="enroll">0</h2></div>
+    <div class="card"><div>Tỷ lệ chuyển đổi</div><h2 id="rate">0%</h2></div>
+    <div class="card"><div>Nguồn hiệu quả nhất</div><h2 id="bestSource">-</h2></div>
+</div>
+
+<div class="insight" id="insightBox">Đang tải dữ liệu...</div>
+
+<div class="grid">
+    <div class="box"><h3>Phễu tuyển sinh</h3><canvas id="funnelChart"></canvas></div>
+    <div class="box"><h3>Hiệu quả nguồn</h3><canvas id="sourceChart"></canvas></div>
+    <div class="box"><h3>Theo lớp</h3><canvas id="classChart"></canvas></div>
+</div>
+
+</div>
+
+<script>
+
+const SHEET_KPI = "https://docs.google.com/spreadsheets/d/15nqatI9RuVvGha5vM7LTONziXk4t-Hwq8Th-WvKV8Jo/export?format=csv&gid=253827489";
+const SHEET_DATA = "https://docs.google.com/spreadsheets/d/15nqatI9RuVvGha5vM7LTONziXk4t-Hwq8Th-WvKV8Jo/export?format=csv&gid=814250884";
+
+let totalLead = 0;
+let totalEnroll = 0;
+
+// ===== LOAD DATA =====
+fetch(SHEET_DATA)
+.then(res => res.text())
+.then(csv => {
+
+    const rows = csv.split("\n").slice(1);
+
+    let sources = {};
+    let classes = {};
+    let funnel = {
+        "Tiềm năng":0,
+        "Chăm sóc":0,
+        "Học thử":0,
+        "Nhập học":0
+    };
+
+    rows.forEach(r=>{
+        const c = r.split(",");
+
+        const lead = parseInt(c[1]) || 0;
+        const enroll = parseInt(c[2]) || 0;
+        const source = c[3];
+        const cls = c[4];
+
+        totalLead += lead;
+        totalEnroll += enroll;
+
+        // nguồn
+        if(!sources[source]) sources[source]=0;
+        sources[source]+=enroll;
+
+        // lớp
+        if(!classes[cls]) classes[cls]=0;
+        classes[cls]+=enroll;
+
+        // funnel (giả lập theo data)
+        funnel["Tiềm năng"] += lead;
+        funnel["Nhập học"] += enroll;
+    });
+
+    // ===== KPI =====
+    document.getElementById("lead").innerText = totalLead;
+    document.getElementById("enroll").innerText = totalEnroll;
+
+    let rate = Math.round(totalEnroll/totalLead*100);
+    document.getElementById("rate").innerText = rate + "%";
+
+    // ===== SOURCE BEST =====
+    let bestSource = Object.keys(sources).reduce((a,b)=>sources[a]>sources[b]?a:b);
+    document.getElementById("bestSource").innerText = bestSource;
+
+    // ===== INSIGHT AUTO =====
+    document.getElementById("insightBox").innerHTML = `
+    📊 <b>Nhận định nhanh:</b><br>
+    - Có ${totalLead} học viên tiềm năng, ${totalEnroll} nhập học (${rate}%)<br>
+    - Nguồn <b>${bestSource}</b> mang lại hiệu quả cao nhất<br>
+    - Tỷ lệ chuyển đổi hiện tại ở mức ${rate}%<br>
+    `;
+
+    // ===== CHART NGUỒN =====
+    new Chart(document.getElementById("sourceChart"),{
+        type:"bar",
+        data:{
+            labels:Object.keys(sources),
+            datasets:[{data:Object.values(sources), backgroundColor:"#10b981"}]
+        }
+    });
+
+    // ===== CHART LỚP =====
+    new Chart(document.getElementById("classChart"),{
+        type:"bar",
+        data:{
+            labels:Object.keys(classes),
+            datasets:[{data:Object.values(classes), backgroundColor:"#f59e0b"}]
+        }
+    });
+
+    // ===== FUNNEL =====
+    new Chart(document.getElementById("funnelChart"),{
+        type:"bar",
+        data:{
+            labels:Object.keys(funnel),
+            datasets:[{data:Object.values(funnel), backgroundColor:"#3b82f6"}]
+        }
+    });
+
+});
+
+</script>
+
+</body>
+</html>
